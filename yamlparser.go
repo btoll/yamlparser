@@ -77,25 +77,24 @@ func GetNode(node *yaml.Node, identifier string) *yaml.Node {
 }
 
 // TODO Add AliasNode support.
-func WalkNodes(node *yaml.Node, prefix string) {
+func WalkNodes(node *yaml.Node, prefix string, lines []string) []string {
 	switch node.Kind {
 	case yaml.DocumentNode:
 		if len(node.Content) > 0 {
 			if node.HeadComment != "" {
-				fmt.Println(node.HeadComment)
+				lines = append(lines, node.HeadComment)
 			}
-			WalkNodes(node.Content[0], buildPrefix(node.Column, 0, ""))
+			lines = WalkNodes(node.Content[0], buildPrefix(node.Column, 0, ""), lines)
 			if node.FootComment != "" {
-				fmt.Println(node.FootComment)
+				lines = append(lines, node.FootComment)
 			}
-		} else {
-			fmt.Println("No Document node, nothing to do...")
-			return
+			//		} else {
+			//			return nil, errors.New("No Document node, nothing to do...")
 		}
 
 	case yaml.MappingNode:
 		if node.Tag == "!!map" && node.HeadComment != "" {
-			fmt.Printf("%s%s\n", buildPrefix(node.Column-2, 0, ""), node.HeadComment)
+			lines = append(lines, fmt.Sprintf("%s%s\n", buildPrefix(node.Column-2, 0, ""), node.HeadComment))
 		}
 		nodes := node.Content
 		var cur *yaml.Node
@@ -107,17 +106,17 @@ func WalkNodes(node *yaml.Node, prefix string) {
 				if next.Line == cur.Line {
 					// TODO: Also add check for FootComment?
 					if cur.HeadComment != "" {
-						fmt.Printf("%s%s\n", buildPrefix(cur.Column, 0, ""), cur.HeadComment)
+						lines = append(lines, fmt.Sprintf("%s%s\n", buildPrefix(cur.Column, 0, ""), cur.HeadComment))
 					}
 					if next.Tag != "!!null" {
-						WalkNodes(next, fmt.Sprintf("%s%s: ", prefix, cur.Value))
+						lines = WalkNodes(next, fmt.Sprintf("%s%s: ", prefix, cur.Value), lines)
 						// Do we need to check if the lines are the same for null tags?
 					} else {
 						cur.Value = cur.Value + ":"
 						if cur.Column > 1 {
-							WalkNodes(cur, buildPrefix(cur.Column, 1, "-"))
+							lines = WalkNodes(cur, buildPrefix(cur.Column, 1, "-"), lines)
 						} else {
-							WalkNodes(cur, buildPrefix(cur.Column, 0, ""))
+							lines = WalkNodes(cur, buildPrefix(cur.Column, 0, ""), lines)
 						}
 					}
 					// Reset the prefix in case we just came from the sequence
@@ -126,10 +125,10 @@ func WalkNodes(node *yaml.Node, prefix string) {
 					i += 1
 				} else {
 					cur.Value = cur.Value + ":"
-					WalkNodes(cur, buildPrefix(cur.Column, 0, ""))
+					lines = WalkNodes(cur, buildPrefix(cur.Column, 0, ""), lines)
 				}
 			} else {
-				WalkNodes(cur, buildPrefix(cur.Column, 0, "")+prefix)
+				lines = WalkNodes(cur, buildPrefix(cur.Column, 0, "")+prefix, lines)
 			}
 		}
 
@@ -157,16 +156,19 @@ func WalkNodes(node *yaml.Node, prefix string) {
 			footComment = fmt.Sprintf("\n%s%s", buildPrefix(node.Column-2, 0, ""), node.FootComment)
 		}
 
-		fmt.Printf("%s%s%v%s%s\n",
-			headComment,
-			prefix,
-			node.Value,
-			lineComment,
-			footComment)
+		lines = append(lines,
+			fmt.Sprintf("%s%s%v%s%s\n",
+				headComment,
+				prefix,
+				node.Value,
+				lineComment,
+				footComment))
 
 	case yaml.SequenceNode:
 		for _, node := range node.Content {
-			WalkNodes(node, buildPrefix(node.Column, node.Column-2, "-"))
+			lines = WalkNodes(node, buildPrefix(node.Column, node.Column-2, "-"), lines)
 		}
 	}
+
+	return lines
 }

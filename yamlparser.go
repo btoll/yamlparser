@@ -76,6 +76,17 @@ func GetNode(node *yaml.Node, identifier string) *yaml.Node {
 	return nil
 }
 
+func addStyle(node *yaml.Node) string {
+	switch node.Style {
+	case yaml.SingleQuotedStyle:
+		return fmt.Sprintf("'%s'", node.Value)
+	case yaml.DoubleQuotedStyle:
+		return fmt.Sprintf("\"%s\"", node.Value)
+	default:
+		return node.Value
+	}
+}
+
 // TODO Add AliasNode support.
 func WalkNodes(node *yaml.Node, prefix string, lines []string) []string {
 	switch node.Kind {
@@ -109,7 +120,10 @@ func WalkNodes(node *yaml.Node, prefix string, lines []string) []string {
 						lines = append(lines, fmt.Sprintf("%s%s\n", buildPrefix(cur.Column, 0, ""), cur.HeadComment))
 					}
 					if next.Tag != "!!null" {
-						lines = WalkNodes(next, fmt.Sprintf("%s%s: ", prefix, cur.Value), lines)
+						// This is reached when a mapping has a key: value pair.
+						// TODO: Each node should be processed the same way, i.e., key (cur) and value (next)
+						// should each be passed recursively to `WalkNodes`.
+						lines = WalkNodes(next, fmt.Sprintf("%s%s: ", prefix, addStyle(cur)), lines)
 						// Do we need to check if the lines are the same for null tags?
 					} else {
 						cur.Value = cur.Value + ":"
@@ -160,7 +174,7 @@ func WalkNodes(node *yaml.Node, prefix string, lines []string) []string {
 			fmt.Sprintf("%s%s%v%s%s\n",
 				headComment,
 				prefix,
-				node.Value,
+				addStyle(node),
 				lineComment,
 				footComment))
 
